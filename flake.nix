@@ -1,0 +1,38 @@
+{
+  description = "Tauri + Rust + Node (Nushell)";
+
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    flake-utils.url = "github:numtide/flake-utils";
+  };
+
+  outputs =
+    {
+      self,
+      nixpkgs,
+      flake-utils,
+    }:
+    flake-utils.lib.eachDefaultSystem (
+      system:
+      let
+        pkgs = import nixpkgs { inherit system; };
+      in
+      {
+        devShells.default = pkgs.mkShell {
+          packages = with pkgs; [
+            rustc
+            cargo
+            nodejs_20
+            nushell
+            pkg-config
+            openssl
+          ];
+          env = {
+            CARGO_TARGET_DIR = "$HOME/.cache/cargo-target";
+            CARGO_INCREMENTAL = "1";
+            RUST_BACKTRACE = "1";
+          };
+        };
+      }
+    );
+}
