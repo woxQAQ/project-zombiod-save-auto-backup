@@ -28,7 +28,7 @@
             openssl
           ];
           env = {
-            CARGO_TARGET_DIR = "$HOME/.cache/cargo-target";
+            # CARGO_TARGET_DIR = "/.cache/cargo-target";
             CARGO_INCREMENTAL = "1";
             RUST_BACKTRACE = "1";
           };
