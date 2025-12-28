@@ -6,37 +6,56 @@ interface SaveSelectorProps {
   onSaveChange: (saveName: string | null) => void;
 }
 
-interface SaveInfo {
-  name: string;
-  path: string;
+interface SaveEntry {
+  game_mode: string;
+  save_name: string;
+  relative_path: string;
 }
 
 /**
  * SaveSelector component
- * Displays a dropdown selector for choosing between available saves
+ * Displays a cascaded dropdown selector for choosing saves grouped by game mode
+ * Supports the two-level directory structure: Saves/<GameMode>/<SaveName>
  */
 export const SaveSelector: React.FC<SaveSelectorProps> = ({ selectedSave, onSaveChange }) => {
-  const [saves, setSaves] = useState<SaveInfo[]>([]);
+  const [savesByGameMode, setSavesByGameMode] = useState<Record<string, SaveEntry[]>>({});
+  const [allSaves, setAllSaves] = useState<SaveEntry[]>([]);
+  const [selectedGameMode, setSelectedGameMode] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Helper function to get display name for game mode
+  const getGameModeDisplay = useCallback((gameMode: string): string => {
+    return gameMode || "(Other)";
+  }, []);
 
   const loadSaves = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      const saveNames: string[] = await invoke("list_save_directories");
-      const saveInfo: SaveInfo[] = saveNames.map((name) => ({
-        name,
-        path: name, // We'll store the name as both name and path for simplicity
-      }));
-      setSaves(saveInfo);
+      const grouped: Record<string, SaveEntry[]> = await invoke("list_save_entries_by_game_mode");
+
+      // Convert to array and sort
+      const saveEntries: SaveEntry[] = Object.values(grouped).flat();
+
+      setSavesByGameMode(grouped);
+      setAllSaves(saveEntries);
 
       // Auto-select the first save if none is selected
-      if (!selectedSave && saveInfo.length > 0) {
-        onSaveChange(saveInfo[0].name);
-      } else if (selectedSave && !saveNames.includes(selectedSave)) {
-        // If the currently selected save no longer exists, clear selection
-        onSaveChange(null);
+      if (!selectedSave && saveEntries.length > 0) {
+        const firstEntry = saveEntries[0];
+        setSelectedGameMode(getGameModeDisplay(firstEntry.game_mode));
+        onSaveChange(firstEntry.relative_path);
+      } else if (selectedSave) {
+        // Find the game mode for the currently selected save
+        const entry = saveEntries.find((e) => e.relative_path === selectedSave);
+        if (entry) {
+          setSelectedGameMode(getGameModeDisplay(entry.game_mode));
+        } else {
+          // If the currently selected save no longer exists, clear selection
+          setSelectedGameMode("");
+          onSaveChange(null);
+        }
       }
     } catch (err) {
       console.error("Failed to load saves:", err);
@@ -44,13 +63,32 @@ export const SaveSelector: React.FC<SaveSelectorProps> = ({ selectedSave, onSave
     } finally {
       setLoading(false);
     }
-  }, [selectedSave, onSaveChange]);
+  }, [selectedSave, onSaveChange, getGameModeDisplay]);
 
   useEffect(() => {
     loadSaves();
   }, [loadSaves]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+  // Get list of available game modes
+  const gameModes = Object.keys(savesByGameMode).sort();
+
+  // Get saves for selected game mode
+  const savesForSelectedMode = selectedGameMode ? savesByGameMode[selectedGameMode] || [] : [];
+
+  const handleGameModeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const gameMode = e.target.value;
+    setSelectedGameMode(gameMode);
+
+    // Auto-select the first save in this game mode
+    const saves = savesByGameMode[gameMode];
+    if (saves && saves.length > 0) {
+      onSaveChange(saves[0].relative_path);
+    } else {
+      onSaveChange(null);
+    }
+  };
+
+  const handleSaveChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const value = e.target.value;
     onSaveChange(value || null);
   };
@@ -113,7 +151,7 @@ export const SaveSelector: React.FC<SaveSelectorProps> = ({ selectedSave, onSave
     );
   }
 
-  if (saves.length === 0) {
+  if (allSaves.length === 0) {
     return (
       <div className="bg-gray-900 border border-gray-800 rounded-lg p-4">
         <div className="flex items-center justify-between">
@@ -148,24 +186,78 @@ export const SaveSelector: React.FC<SaveSelectorProps> = ({ selectedSave, onSave
 
   return (
     <div className="bg-gray-900 border border-gray-800 rounded-lg p-4">
-      <label htmlFor="save-select" className="block text-sm font-medium text-gray-400 mb-2">
-        Select Save
-      </label>
-      <select
-        id="save-select"
-        value={selectedSave || ""}
-        onChange={handleChange}
-        className="w-full bg-gray-800 border border-gray-700 rounded-md px-4 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
-      >
-        <option value="">-- Select a save --</option>
-        {saves.map((save) => (
-          <option key={save.name} value={save.name}>
-            {save.name}
-          </option>
-        ))}
-      </select>
-      <p className="mt-2 text-xs text-gray-500">
-        {saves.length} save{saves.length !== 1 ? "s" : ""} available
+      <div className="flex items-center gap-4">
+        {/* Game Mode Selector */}
+        <div className="flex-1">
+          <label
+            htmlFor="game-mode-select"
+            className="block text-sm font-medium text-gray-400 mb-2"
+          >
+            Game Mode
+          </label>
+          <select
+            id="game-mode-select"
+            value={selectedGameMode}
+            onChange={handleGameModeChange}
+            disabled={gameModes.length === 0}
+            className="w-full bg-gray-800 border border-gray-700 rounded-md px-4 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all disabled:bg-gray-850 disabled:text-gray-600 disabled:cursor-not-allowed"
+          >
+            {gameModes.length === 0 ? (
+              <option value="">No game modes</option>
+            ) : (
+              <>
+                <option value="">-- Select mode --</option>
+                {gameModes.map((mode) => (
+                  <option key={mode} value={mode}>
+                    {mode} ({savesByGameMode[mode].length})
+                  </option>
+                ))}
+              </>
+            )}
+          </select>
+        </div>
+
+        {/* Save Selector */}
+        <div className="flex-1">
+          <label htmlFor="save-select" className="block text-sm font-medium text-gray-400 mb-2">
+            Save Name
+          </label>
+          <select
+            id="save-select"
+            value={selectedSave || ""}
+            onChange={handleSaveChange}
+            disabled={!selectedGameMode || savesForSelectedMode.length === 0}
+            className="w-full bg-gray-800 border border-gray-700 rounded-md px-4 py-2 text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all disabled:bg-gray-850 disabled:text-gray-600 disabled:cursor-not-allowed"
+          >
+            {!selectedGameMode || savesForSelectedMode.length === 0 ? (
+              <option value="">-- Select save --</option>
+            ) : (
+              <>
+                <option value="">-- Select save --</option>
+                {savesForSelectedMode.map((save) => (
+                  <option key={save.relative_path} value={save.relative_path}>
+                    {save.save_name}
+                  </option>
+                ))}
+              </>
+            )}
+          </select>
+        </div>
+      </div>
+
+      {/* Footer info */}
+      <p className="mt-3 text-xs text-gray-500 flex items-center justify-between">
+        <span>
+          {allSaves.length} save{allSaves.length !== 1 ? "s" : ""} across {gameModes.length} game
+          mode
+          {gameModes.length !== 1 ? "s" : ""}
+        </span>
+        {selectedSave && (
+          <span className="text-gray-400">
+            {selectedGameMode} /{" "}
+            {savesForSelectedMode.find((s) => s.relative_path === selectedSave)?.save_name}
+          </span>
+        )}
       </p>
     </div>
   );
