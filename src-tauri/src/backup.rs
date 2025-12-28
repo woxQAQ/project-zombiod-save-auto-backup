@@ -180,7 +180,7 @@ pub fn create_backup(save_name: &str) -> BackupResultT<BackupResult> {
     let (retained, deleted) = garbage_collection(&save_backup_dir, retention_count)?;
 
     Ok(BackupResult {
-        backup_path: backup_path.to_string_lossy().to_string(),
+        backup_path: crate::file_ops::normalize_path_for_display(&backup_path),
         backup_name,
         retained_count: retained,
         deleted_count: deleted,
@@ -311,7 +311,7 @@ pub fn list_backups(save_name: &str) -> BackupResultT<Vec<BackupInfo>> {
 
                     backups.push(BackupInfo {
                         name: name_str.to_string(),
-                        path: path.to_string_lossy().to_string(),
+                        path: crate::file_ops::normalize_path_for_display(&path),
                         size_bytes,
                         size_formatted,
                         created_at,
@@ -361,7 +361,7 @@ pub fn get_backup_info(save_name: &str, backup_name: &str) -> BackupResultT<Back
 
     Ok(BackupInfo {
         name: backup_name.to_string(),
-        path: backup_path.to_string_lossy().to_string(),
+        path: crate::file_ops::normalize_path_for_display(&backup_path),
         size_bytes,
         size_formatted,
         created_at,
