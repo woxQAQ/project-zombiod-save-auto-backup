@@ -30,7 +30,7 @@ fn greet(name: &str) -> String {
 /// * `dst_path` - Destination directory path (as string)
 ///
 /// # Returns
-/// `Result<(), FileOpsResult>` - Ok(()) on success, Err with message on failure
+/// `Result<(), FileOpsError>` - Ok(()) on success, Err with message on failure
 ///
 /// # Example (Frontend)
 /// ```javascript
@@ -56,7 +56,7 @@ fn copy_dir_recursive(src_path: String, dst_path: String) -> FileOpsResult<()> {
 /// * `path` - Path to directory to delete (as string)
 ///
 /// # Returns
-/// `Result<(), FileOpsResult>` - Ok(()) on success, Err with message on failure
+/// `Result<(), FileOpsError>` - Ok(()) on success, Err with message on failure
 ///
 /// # Safety
 /// This is a destructive operation. Frontend should confirm with user before calling.
