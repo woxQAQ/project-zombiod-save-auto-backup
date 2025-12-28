@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
+import { useCallback, useEffect, useState } from "react";
 
 /**
  * Configuration interface matching the Rust Config struct
@@ -39,14 +39,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  // Load configuration on mount
-  useEffect(() => {
-    if (isOpen) {
-      loadConfig();
-    }
-  }, [isOpen]);
-
-  const loadConfig = async () => {
+  const loadConfig = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
@@ -60,7 +53,14 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
+
+  // Load configuration on mount
+  useEffect(() => {
+    if (isOpen) {
+      loadConfig();
+    }
+  }, [isOpen, loadConfig]);
 
   const handleSelectSavePath = async () => {
     try {
@@ -118,7 +118,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
 
   const validateInputs = (): string | null => {
     const retention = parseInt(retentionInput, 10);
-    if (isNaN(retention) || retention < 1) {
+    if (Number.isNaN(retention) || retention < 1) {
       return "Retention count must be at least 1";
     }
     if (retention > 100) {
@@ -195,6 +195,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
               strokeLinejoin="round"
               className="w-5 h-5 text-gray-400"
             >
+              <title>Close</title>
               <line x1="18" y1="6" x2="6" y2="18" />
               <line x1="6" y1="6" x2="18" y2="18" />
             </svg>
@@ -225,7 +226,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
 
               {/* Save Path Section */}
               <div className="space-y-2">
-                <label className="block text-sm font-medium text-foreground">
+                <label htmlFor="save-path" className="block text-sm font-medium text-foreground">
                   Zomboid Save Path
                   <span className="text-gray-500 font-normal ml-2">
                     (Directory containing save folders)
@@ -233,6 +234,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
                 </label>
                 <div className="flex gap-2">
                   <input
+                    id="save-path"
                     type="text"
                     value={savePathInput}
                     onChange={(e) => setSavePathInput(e.target.value)}
@@ -262,14 +264,13 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
 
               {/* Backup Path Section */}
               <div className="space-y-2">
-                <label className="block text-sm font-medium text-foreground">
+                <label htmlFor="backup-path" className="block text-sm font-medium text-foreground">
                   Backup Storage Path
-                  <span className="text-gray-500 font-normal ml-2">
-                    (Where backups are stored)
-                  </span>
+                  <span className="text-gray-500 font-normal ml-2">(Where backups are stored)</span>
                 </label>
                 <div className="flex gap-2">
                   <input
+                    id="backup-path"
                     type="text"
                     value={backupPathInput}
                     onChange={(e) => setBackupPathInput(e.target.value)}
@@ -300,7 +301,10 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
 
               {/* Retention Count Section */}
               <div className="space-y-2">
-                <label className="block text-sm font-medium text-foreground">
+                <label
+                  htmlFor="retention-count"
+                  className="block text-sm font-medium text-foreground"
+                >
                   Backup Retention Count
                   <span className="text-gray-500 font-normal ml-2">
                     (Max backups to keep per save)
@@ -308,6 +312,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
                 </label>
                 <div className="flex items-center gap-4">
                   <input
+                    id="retention-count"
                     type="number"
                     min="1"
                     max="100"
@@ -325,16 +330,13 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
                   />
                 </div>
                 <p className="text-xs text-gray-500">
-                  Old backups exceeding this count will be automatically deleted.
-                  Recommended: 5-20
+                  Old backups exceeding this count will be automatically deleted. Recommended: 5-20
                 </p>
               </div>
 
               {/* Info Box */}
               <div className="bg-gray-900/50 border border-gray-800 rounded-lg p-4">
-                <h3 className="text-sm font-medium text-foreground mb-2">
-                  Path Information
-                </h3>
+                <h3 className="text-sm font-medium text-foreground mb-2">Path Information</h3>
                 <ul className="text-xs text-gray-400 space-y-1">
                   <li>• Save path should contain your save folders (e.g., Survival, Builder)</li>
                   <li>• Backup path will be created automatically if it doesn't exist</li>

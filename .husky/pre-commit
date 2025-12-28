@@ -1,0 +1,8 @@
+echo "Running pre-commit hooks..."
+echo "1. Running TypeScript type check..."
+pnpm exec tsc --noEmit
+
+echo "2. Running Biome linter and formatter check..."
+pnpm exec biome check --write src/
+
+echo "Pre-commit checks passed!"
