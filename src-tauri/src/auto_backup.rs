@@ -52,19 +52,6 @@ pub struct AutoBackupStatus {
     pub started_at: Option<String>,
 }
 
-/// Result of a backup operation triggered by auto backup.
-#[derive(Debug, Serialize, Deserialize)]
-pub struct AutoBackupResult {
-    /// Name of the save that was backed up
-    pub save_name: String,
-    /// Whether the backup was successful
-    pub success: bool,
-    /// Error message if backup failed
-    pub error_message: Option<String>,
-    /// Backup result if successful
-    pub backup_result: Option<BackupResult>,
-}
-
 /// Error type for auto backup operations.
 #[derive(Debug)]
 pub enum AutoBackupError {
