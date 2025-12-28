@@ -10,4 +10,4 @@ features[12]{id,priority,dependencies,description}:
   UI-04,High,"[✓]","UI-03,CORE-04","仪表盘 - 核心交互。1. 实现'立即备份'按钮 (调用 CORE-03)。 2. 实现'恢复'按钮及二次确认弹窗 (调用 CORE-04)。"
   UI-05,Medium,"[✓]","UI-04,CORE-05","自动备份控制 UI。在界面上显示自动备份开关和倒计时状态。与 CORE-05 对接。"
   CORE-06,High,"[✓]","CORE-02","存档扫描逻辑升级 (Rust)。支持 `Saves/<GameMode>/<SaveName>` 二级目录结构。扫描所有模式文件夹下的具体存档，而非仅扫描根目录。"
-  UI-06,High,"[ ]","UI-03,CORE-06","存档选择器升级 (UI)。重构 `SaveSelector` 组件，适配新的数据结构。实现按'游戏模式'分组的下拉菜单或级联选择，优化多存档展示体验。"
+  UI-06,High,"[✓]","UI-03,CORE-06","存档选择器升级 (UI)。重构 `SaveSelector` 组件，适配新的数据结构。实现按'游戏模式'分组的下拉菜单或级联选择，优化多存档展示体验。"
