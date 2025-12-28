@@ -15,3 +15,8 @@ Log[3]
     content: "fix(core-02): Address PR review comments - Simplified redundant platform detection code in get_config_dir() and detect_zomboid_save_path(), improved error message for zero retention count to include actual value"
     file-related[1]: src-tauri/src/config.rs
     responded-comment-id: IC_kwDOQtGHec7cN2v2
+
+Log[4]
+  - time: 2025-12-28T12:00:00Z
+    content: "feat(core-03): Implement core backup logic with garbage collection - CORE-03 completed. Added timestamped backup generation (format: {SaveName}_{YYYY-MM-DD}_{HH-mm-ss}), automatic GC to remove old backups exceeding retention limit, backup listing and metadata queries, and 6 new Tauri commands. All 48 unit tests passing. Key features: automatic retention policy enforcement, ISO 8601 timestamps, comprehensive backup metadata (size, creation time, paths). Branch: feat/core-03-backup-logic"
+    file-related[4]: src-tauri/src/backup.rs,src-tauri/src/lib.rs,src-tauri/Cargo.toml,src-tauri/Cargo.lock
