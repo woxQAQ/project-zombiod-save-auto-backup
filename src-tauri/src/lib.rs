@@ -6,7 +6,7 @@ mod config;
 mod file_ops;
 mod restore;
 
-use backup::{BackupError, BackupInfo, BackupResult, BackupResultT};
+use backup::{BackupInfo, BackupResult, BackupResultT};
 use config::{Config, ConfigResult};
 use file_ops::FileOpsResult;
 use restore::{RestoreError, RestoreResult, RestoreResultT, UndoSnapshotInfo};

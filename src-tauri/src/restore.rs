@@ -246,6 +246,11 @@ fn create_undo_snapshot(
 /// # Safety
 /// - Creates undo snapshot before any destructive operations
 /// - If current save doesn't exist, proceeds without snapshot (first-time restore scenario)
+///
+/// # Warning
+/// If Project Zomboid is running and has the save files open, this operation
+/// may fail due to file locks. The frontend should detect if the game is running
+/// and warn the user before attempting a restore.
 pub fn restore_backup(save_name: &str, backup_name: &str) -> RestoreResultT<RestoreResult> {
     let config = config_module::load_config()?;
     let save_path = config.get_save_path()?;
