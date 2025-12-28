@@ -152,8 +152,9 @@ fn copy_file(src: &Path, dst: &Path) -> FileOpsResult<()> {
         dst_file.write_all(&buffer[..bytes_read])?;
     }
 
-    // Try to preserve metadata, but don't fail if it's not supported
-    let _ = fs::copy(src, dst); // This preserves metadata on supported platforms
+    // Ensure data is written to disk for backup integrity
+    dst_file.flush()?;
+    dst_file.sync_all()?;
 
     Ok(())
 }

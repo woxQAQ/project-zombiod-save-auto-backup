@@ -30,7 +30,7 @@ fn greet(name: &str) -> String {
 /// * `dst_path` - Destination directory path (as string)
 ///
 /// # Returns
-/// `Result<(), ErrorResponse>` - Ok(()) on success, Err with message on failure
+/// `Result<(), FileOpsResult>` - Ok(()) on success, Err with message on failure
 ///
 /// # Example (Frontend)
 /// ```javascript
@@ -56,7 +56,7 @@ fn copy_dir_recursive(src_path: String, dst_path: String) -> FileOpsResult<()> {
 /// * `path` - Path to directory to delete (as string)
 ///
 /// # Returns
-/// `Result<(), ErrorResponse>` - Ok(()) on success, Err with message on failure
+/// `Result<(), FileOpsResult>` - Ok(()) on success, Err with message on failure
 ///
 /// # Safety
 /// This is a destructive operation. Frontend should confirm with user before calling.
@@ -84,7 +84,7 @@ fn delete_dir_recursive(path: String) -> FileOpsResult<()> {
 /// * `path` - Path to directory (as string)
 ///
 /// # Returns
-/// `Result<DirSizeResult, ErrorResponse>` - Size information on success, Err on failure
+/// `Result<DirSizeResult, FileOpsError>` - Size information on success, Err on failure
 ///
 /// # Example (Frontend)
 /// ```javascript
