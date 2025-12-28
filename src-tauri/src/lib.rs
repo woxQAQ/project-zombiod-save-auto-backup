@@ -153,15 +153,15 @@ fn format_size(bytes: u64) -> String {
 ///
 /// try {
 ///   await invoke('show_in_file_manager', {
-///     path: '/path/to/backup'
+///     thePath: '/path/to/backup'
 ///   });
 /// } catch (err) {
 ///   console.error('Failed to open:', err);
 /// }
 /// ```
 #[tauri::command]
-fn show_in_file_manager(path: String) -> FileOpsResult<()> {
-    file_ops::show_in_file_manager(Path::new(&path))
+fn show_in_file_manager(the_path: String) -> FileOpsResult<()> {
+    file_ops::show_in_file_manager(Path::new(&the_path))
 }
 
 // ============================================================================
