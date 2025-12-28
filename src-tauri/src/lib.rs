@@ -134,6 +134,36 @@ fn format_size(bytes: u64) -> String {
     file_ops::format_size(bytes)
 }
 
+/// Tauri command: Opens a path in the system file manager.
+///
+/// # Arguments
+/// * `path` - Path to the file or directory (as string)
+///
+/// # Returns
+/// `FileOpsResult<()>` - Ok(()) on success, Err on failure
+///
+/// # Behavior
+/// - On macOS: Reveals the file/directory in Finder
+/// - On Windows: Selects the file/directory in Explorer
+/// - On Linux: Opens the parent directory in the default file manager
+///
+/// # Example (Frontend)
+/// ```javascript
+/// import { invoke } from '@tauri-apps/api/core';
+///
+/// try {
+///   await invoke('show_in_file_manager', {
+///     path: '/path/to/backup'
+///   });
+/// } catch (err) {
+///   console.error('Failed to open:', err);
+/// }
+/// ```
+#[tauri::command]
+fn show_in_file_manager(path: String) -> FileOpsResult<()> {
+    file_ops::show_in_file_manager(Path::new(&path))
+}
+
 // ============================================================================
 // Config Commands (CORE-02)
 // ============================================================================
@@ -777,6 +807,7 @@ pub fn run() {
             delete_dir_recursive,
             get_dir_size,
             format_size,
+            show_in_file_manager,
             // Config commands (CORE-02)
             load_config_command,
             save_config_command,

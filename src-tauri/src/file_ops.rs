@@ -284,6 +284,107 @@ pub fn format_size(bytes: u64) -> String {
     }
 }
 
+/// Opens the parent directory of the given path in the system file manager.
+///
+/// # Arguments
+/// * `path` - Path to the file or directory
+///
+/// # Returns
+/// `FileOpsResult<()>` - Ok(()) on success, Err on failure
+///
+/// # Behavior
+/// - On macOS: Uses `open -R` to reveal the file/directory in Finder
+/// - On Windows: Uses `explorer /select` to select the file/directory in Explorer
+/// - On Linux: Attempts to use `dbus` for GNOME/KDE, falls back to `xdg-open` for the parent directory
+///
+/// # Example
+/// ```no_run
+/// use std::path::Path;
+/// use tauri_app_lib::file_ops::show_in_file_manager;
+///
+/// show_in_file_manager(Path::new("/path/to/backup")).unwrap();
+/// ```
+pub fn show_in_file_manager(path: &Path) -> FileOpsResult<()> {
+    if !path.exists() {
+        return Err(FileOpsError::SourceNotFound(path.to_path_buf()));
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open")
+            .arg("-R")
+            .arg(path)
+            .spawn()
+            .map_err(FileOpsError::Io)?;
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new("explorer")
+            .arg("/select,")
+            .arg(path)
+            .spawn()
+            .map_err(FileOpsError::Io)?;
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        // Try different methods for Linux depending on the desktop environment
+        let path_str = path.to_string_lossy().to_string();
+
+        // Try dbus for GNOME (nautilus/Files)
+        let gnome_result = std::process::Command::new("dbus-send")
+            .args([
+                "--session",
+                "--dest=org.gnome.Nautilus",
+                "--type=method_call",
+                "/org/gnome/Nautilus",
+                "org.gtk.Actions.Activate",
+                &format!("array:string:'show-item'", "string:"),
+                &format!("array:string:'file://{}'", path_str),
+                "array:string:",
+            ])
+            .spawn();
+
+        if gnome_result.is_ok() {
+            return Ok(());
+        }
+
+        // Try dbus for KDE (dolphin)
+        let kde_result = std::process::Command::new("dbus-send")
+            .args([
+                "--session",
+                "--dest=org.kde.dolphin",
+                "--type=method_call",
+                "/dolphin",
+                "org.freedesktop.Application.Activate",
+                &format!("array:string:'select'", "string:"),
+                &format!("array:string:'{}'", path_str),
+                "array:string:",
+            ])
+            .spawn();
+
+        if kde_result.is_ok() {
+            return Ok(());
+        }
+
+        // Fallback: open the parent directory
+        if let Some(parent) = path.parent() {
+            std::process::Command::new("xdg-open")
+                .arg(parent)
+                .spawn()
+                .map_err(FileOpsError::Io)?;
+        } else {
+            std::process::Command::new("xdg-open")
+                .arg(path)
+                .spawn()
+                .map_err(FileOpsError::Io)?;
+        }
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

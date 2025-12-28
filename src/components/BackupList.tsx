@@ -21,6 +21,7 @@ interface BackupItem {
   sizeFormatted: string;
   createdAt: string;
   timeAgo: string;
+  backupPath: string;
 }
 
 /**
@@ -90,6 +91,7 @@ export const BackupList: React.FC<BackupListProps> = ({
         sizeFormatted: info.size_formatted,
         createdAt: formatDateTime(info.created_at),
         timeAgo: formatTimeAgo(info.created_at),
+        backupPath: info.backup_path,
       }));
 
       setBackups(items);
@@ -119,6 +121,17 @@ export const BackupList: React.FC<BackupListProps> = ({
   const handleDelete = (backup: BackupItem) => {
     if (onDelete && saveName) {
       onDelete(saveName, backup.name, backup.createdAt);
+    }
+  };
+
+  const handleOpenInFileManager = async (backup: BackupItem) => {
+    try {
+      await invoke("show_in_file_manager", {
+        path: backup.backupPath,
+      });
+    } catch (err) {
+      console.error("Failed to open in file manager:", err);
+      // Optionally show an error message to the user
     }
   };
 
@@ -283,6 +296,28 @@ export const BackupList: React.FC<BackupListProps> = ({
                   className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded transition-colors"
                 >
                   Restore
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleOpenInFileManager(backup)}
+                  className="p-2 text-gray-400 hover:bg-gray-700 hover:text-gray-200 rounded transition-colors opacity-0 group-hover:opacity-100"
+                  aria-label="Open in file manager"
+                  title="Open in file manager"
+                >
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    className="w-5 h-5"
+                    aria-hidden="true"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
+                    />
+                  </svg>
                 </button>
                 {onDelete && (
                   <button
