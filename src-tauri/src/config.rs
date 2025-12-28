@@ -531,8 +531,9 @@ fn looks_like_save_directory(path: &Path) -> bool {
                 let name = file_path.file_name()
                     .and_then(|n| n.to_str())
                     .unwrap_or("");
-                // Typical save files
-                if name == "save.bin" || name == "map_p.bin" || name.ends_with(".bin") {
+                // Typical save files - be more specific to avoid false positives
+                // Check for specific known save files or map chunk files (prefix_*.bin)
+                if name == "save.bin" || name == "map_p.bin" || (name.starts_with("map_") && name.ends_with(".bin")) {
                     return true;
                 }
             }
@@ -576,8 +577,9 @@ pub fn list_save_entries_by_game_mode() -> ConfigResult<std::collections::HashMa
     let mut grouped: std::collections::HashMap<String, Vec<SaveEntry>> = std::collections::HashMap::new();
 
     for entry in entries {
+        // Use "(Other)" with parentheses to avoid collision with actual game mode named "Other"
         let game_mode = if entry.game_mode.is_empty() {
-            "<Other>".to_string()
+            "(Other)".to_string()
         } else {
             entry.game_mode.clone()
         };

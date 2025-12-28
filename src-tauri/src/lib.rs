@@ -244,6 +244,10 @@ fn update_retention_count(count: usize) -> ConfigResult<()> {
 
 /// Tauri command: Lists all save directories in the Zomboid saves folder.
 ///
+/// # Deprecated
+/// Consider using `list_save_entries` instead for full game mode support.
+/// This command is kept for backward compatibility.
+///
 /// # Returns
 /// `ConfigResult<Vec<String>>` - List of save names
 ///
