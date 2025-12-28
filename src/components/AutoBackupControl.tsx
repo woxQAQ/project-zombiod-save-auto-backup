@@ -58,7 +58,7 @@ export const AutoBackupControl: React.FC<AutoBackupControlProps> = ({
   // Load auto backup status
   const loadStatus = useCallback(async () => {
     try {
-      const result: AutoBackupStatus = await invoke("get_auto_backup_status");
+      const result: AutoBackupStatus = await invoke("get_auto_backup_status_command");
       setStatus(result);
       setIntervalInput(String(result.interval_seconds));
     } catch (err) {
@@ -107,10 +107,10 @@ export const AutoBackupControl: React.FC<AutoBackupControlProps> = ({
     try {
       setIsTogglingService(true);
       if (status?.is_running) {
-        await invoke("stop_auto_backup");
+        await invoke("stop_auto_backup_command");
         notify("Auto backup service stopped", "success");
       } else {
-        await invoke("start_auto_backup");
+        await invoke("start_auto_backup_command");
         notify("Auto backup service started", "success");
       }
       await loadStatus();
@@ -130,10 +130,10 @@ export const AutoBackupControl: React.FC<AutoBackupControlProps> = ({
       setIsTogglingSave(true);
       const currentState = status?.saves[selectedSave]?.enabled ?? false;
       if (currentState) {
-        await invoke("disable_auto_backup", { saveName: selectedSave });
+        await invoke("disable_auto_backup_command", { saveName: selectedSave });
         notify(`Auto backup disabled for '${selectedSave}'`, "success");
       } else {
-        await invoke("enable_auto_backup", { saveName: selectedSave });
+        await invoke("enable_auto_backup_command", { saveName: selectedSave });
         notify(`Auto backup enabled for '${selectedSave}'`, "success");
       }
       await loadStatus();
@@ -154,7 +154,7 @@ export const AutoBackupControl: React.FC<AutoBackupControlProps> = ({
         notify("Interval must be between 60 and 86400 seconds (1 minute to 24 hours)", "warning");
         return;
       }
-      await invoke("set_auto_backup_interval", { seconds });
+      await invoke("set_auto_backup_interval_command", { seconds });
       await loadStatus();
       setShowIntervalEdit(false);
       notify(`Backup interval updated to ${formatInterval(seconds)}`, "success");

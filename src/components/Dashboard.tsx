@@ -67,7 +67,7 @@ export const Dashboard: React.FC = () => {
   useEffect(() => {
     const refreshAutoBackupSaves = async () => {
       try {
-        await invoke("refresh_auto_backup_saves");
+        await invoke("refresh_auto_backup_saves_command");
       } catch (err) {
         console.error("Failed to refresh auto backup saves:", err);
       }
