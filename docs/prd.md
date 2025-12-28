@@ -20,8 +20,12 @@
         *   Windows: `C:\Users\<User>\Zomboid\Saves`
         *   Mac: `~/Zomboid/Saves`
         *   Linux: `~/Zomboid/Saves`
-*   **手动配置**：若自动检测失败或用户使用了非标准安装，允许手动选择“游戏存档源目录”和“备份存储目录”。
-*   **多模式支持**：能够识别 Survivor、Sandbox、Multiplayer 等不同模式下的存档文件夹。
+*   **手动配置**：若自动检测失败或用户使用了非标准安装，允许手动选择“游戏存档源目录” (Root Saves Directory) 和“备份存储目录”。
+*   **多模式支持与层级结构**：
+    *   识别存档的二级目录结构：`Saves/<GameMode>/<SaveName>`。
+    *   第一级目录为游戏模式（如 Sandbox, Apocalypse, Survivor, Multiplayer）。
+    *   第二级目录才是具体的玩家存档。
+    *   系统需扫描所有模式目录下的所有存档。
 
 ### 3.2 备份机制
 *   **定时自动备份**：

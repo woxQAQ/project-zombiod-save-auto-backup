@@ -1,4 +1,4 @@
-features[10]{id,priority,dependencies,description}:
+features[12]{id,priority,dependencies,description}:
   CORE-01,Critical,"[✓]","基础文件系统能力 (Rust)。实现文件夹递归复制、删除、计算大小的通用函数。这是所有功能的基石。"
   CORE-02,Critical,"[✓]","配置与路径管理 (Rust)。1. 实现自动检测当前 OS 的 Zomboid 存档路径。 2. 实现配置文件的读写（保存用户自定义路径、备份策略等）。"
   CORE-03,High,"[✓]","核心备份逻辑 (Rust)。实现 `create_backup` 命令：接受源路径，生成带时间戳的备份文件夹。包含旧备份的自动清理逻辑 (GC) 以符合保留数量限制。"
@@ -9,3 +9,5 @@ features[10]{id,priority,dependencies,description}:
   UI-03,High,"[✓]","UI-01,CORE-02","仪表盘 - 状态与列表。1. 读取并显示当前存档列表。 2. 展示选中存档的历史备份列表 (时间、大小)。"
   UI-04,High,"[✓]","UI-03,CORE-04","仪表盘 - 核心交互。1. 实现'立即备份'按钮 (调用 CORE-03)。 2. 实现'恢复'按钮及二次确认弹窗 (调用 CORE-04)。"
   UI-05,Medium,"[✓]","UI-04,CORE-05","自动备份控制 UI。在界面上显示自动备份开关和倒计时状态。与 CORE-05 对接。"
+  CORE-06,High,"[✓]","CORE-02","存档扫描逻辑升级 (Rust)。支持 `Saves/<GameMode>/<SaveName>` 二级目录结构。扫描所有模式文件夹下的具体存档，而非仅扫描根目录。"
+  UI-06,High,"[ ]","UI-03,CORE-06","存档选择器升级 (UI)。重构 `SaveSelector` 组件，适配新的数据结构。实现按'游戏模式'分组的下拉菜单或级联选择，优化多存档展示体验。"
