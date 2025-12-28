@@ -1,5 +1,6 @@
-import React, { ReactNode } from 'react';
-import { Header } from './Header';
+import type React from "react";
+import type { ReactNode } from "react";
+import { Header } from "./Header";
 
 interface LayoutProps {
   children: ReactNode;
@@ -14,9 +15,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onSettingsClick }) => 
   return (
     <div className="h-screen flex flex-col bg-background text-foreground overflow-hidden">
       <Header onSettingsClick={onSettingsClick} />
-      <main className="flex-1 overflow-auto">
-        {children}
-      </main>
+      <main className="flex-1 overflow-auto">{children}</main>
     </div>
   );
 };
