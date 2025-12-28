@@ -137,7 +137,7 @@ fn format_size(bytes: u64) -> String {
 /// Tauri command: Opens a path in the system file manager.
 ///
 /// # Arguments
-/// * `path` - Path to the file or directory (as string)
+/// * `target_path` - Path to the file or directory (as string)
 ///
 /// # Returns
 /// `FileOpsResult<()>` - Ok(()) on success, Err on failure
@@ -153,15 +153,15 @@ fn format_size(bytes: u64) -> String {
 ///
 /// try {
 ///   await invoke('show_in_file_manager', {
-///     thePath: '/path/to/backup'
+///     targetPath: '/path/to/backup'
 ///   });
 /// } catch (err) {
 ///   console.error('Failed to open:', err);
 /// }
 /// ```
 #[tauri::command]
-fn show_in_file_manager(the_path: String) -> FileOpsResult<()> {
-    file_ops::show_in_file_manager(Path::new(&the_path))
+fn show_in_file_manager(target_path: String) -> FileOpsResult<()> {
+    file_ops::show_in_file_manager(Path::new(&target_path))
 }
 
 // ============================================================================
