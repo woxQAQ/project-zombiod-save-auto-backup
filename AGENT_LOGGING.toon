@@ -4,3 +4,8 @@ Log[1]
   - time: 2024-12-28T03:50:00Z
     content: "feat(core-01): Implement basic file system operations - CORE-01 completed"
     file-related[5]: src-tauri/src/file_ops.rs,src-tauri/src/lib.rs,src-tauri/Cargo.toml,AGENT_LOGGING.toon,FEATURE_LIST.toon
+
+Log[2]
+  - time: 2025-12-28T10:30:00Z
+    content: "feat(core-02): Implement configuration and path management - CORE-02 completed. Added platform-specific Zomboid save path detection (Windows/Mac/Linux), configuration persistence with JSON format, and 8 Tauri commands for frontend integration. All unit tests passing (30 tests). Branch: feat/core-02-config-path-management"
+    file-related[4]: src-tauri/src/config.rs,src-tauri/src/lib.rs,src-tauri/Cargo.toml,src-tauri/Cargo.lock
