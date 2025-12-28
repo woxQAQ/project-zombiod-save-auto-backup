@@ -9,7 +9,7 @@ mod restore;
 
 use auto_backup::{AutoBackupStatus, AutoBackupResultT};
 use backup::{BackupInfo, BackupResult, BackupResultT};
-use config::{Config, ConfigResult};
+use config::{Config, ConfigResult, SaveEntry};
 use file_ops::FileOpsResult;
 use restore::{RestoreResult, RestoreResultT, UndoSnapshotInfo};
 use serde::{Deserialize, Serialize};
@@ -244,6 +244,10 @@ fn update_retention_count(count: usize) -> ConfigResult<()> {
 
 /// Tauri command: Lists all save directories in the Zomboid saves folder.
 ///
+/// # Deprecated
+/// Consider using `list_save_entries` instead for full game mode support.
+/// This command is kept for backward compatibility.
+///
 /// # Returns
 /// `ConfigResult<Vec<String>>` - List of save names
 ///
@@ -258,6 +262,57 @@ fn update_retention_count(count: usize) -> ConfigResult<()> {
 #[tauri::command]
 fn list_save_directories() -> ConfigResult<Vec<String>> {
     config::list_save_directories()
+}
+
+/// Tauri command: Lists all save entries with game mode information.
+///
+/// # Returns
+/// `ConfigResult<Vec<SaveEntry>>` - List of save entries with game mode info
+///
+/// # Behavior
+/// Scans the Zomboid saves directory for the two-level structure `Saves/<GameMode>/<SaveName>`.
+/// Also supports legacy flat structure for backwards compatibility.
+///
+/// # Example (Frontend)
+/// ```javascript
+/// import { invoke } from '@tauri-apps/api/core';
+///
+/// const entries = await invoke('list_save_entries');
+/// console.log('Available saves:', entries);
+/// // [
+/// //   { gameMode: "Survival", saveName: "MySave1", relativePath: "Survival/MySave1" },
+/// //   { gameMode: "Builder", saveName: "Builder1", relativePath: "Builder/Builder1" },
+/// //   { gameMode: "", saveName: "OldSave", relativePath: "OldSave" }
+/// // ]
+/// ```
+#[tauri::command]
+fn list_save_entries() -> ConfigResult<Vec<SaveEntry>> {
+    config::list_save_entries()
+}
+
+/// Tauri command: Lists save entries grouped by game mode.
+///
+/// # Returns
+/// `ConfigResult<std::collections::HashMap<String, Vec<SaveEntry>>>` - Map of game mode to save entries
+///
+/// # Example (Frontend)
+/// ```javascript
+/// import { invoke } from '@tauri-apps/api/core';
+///
+/// const grouped = await invoke('list_save_entries_by_game_mode');
+/// console.log('Saves by mode:', grouped);
+/// // {
+/// //   "Survival": [
+/// //     { gameMode: "Survival", saveName: "MySave1", relativePath: "Survival/MySave1" }
+/// //   ],
+/// //   "Builder": [
+/// //     { gameMode: "Builder", saveName: "Builder1", relativePath: "Builder/Builder1" }
+/// //   ]
+/// // }
+/// ```
+#[tauri::command]
+fn list_save_entries_by_game_mode() -> ConfigResult<std::collections::HashMap<String, Vec<SaveEntry>>> {
+    config::list_save_entries_by_game_mode()
 }
 
 /// Tauri command: Detects the default Zomboid save path for the current platform.
@@ -729,6 +784,8 @@ pub fn run() {
             update_backup_path,
             update_retention_count,
             list_save_directories,
+            list_save_entries,
+            list_save_entries_by_game_mode,
             detect_zomboid_save_path,
             get_default_backup_path,
             // Backup commands (CORE-03)

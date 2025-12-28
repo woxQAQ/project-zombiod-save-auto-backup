@@ -353,10 +353,249 @@ pub fn list_save_directories() -> ConfigResult<Vec<String>> {
     Ok(saves)
 }
 
+/// A save entry with game mode information.
+///
+/// Represents a single save with its associated game mode.
+/// Used for the two-level directory structure: `Saves/<GameMode>/<SaveName>`.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+pub struct SaveEntry {
+    /// The game mode (e.g., "Survival", "Builder", "Sandbox")
+    pub game_mode: String,
+    /// The save name (actual save folder name)
+    pub save_name: String,
+    /// Full relative path from Saves root (e.g., "Survival/MySave")
+    pub relative_path: String,
+}
+
+impl SaveEntry {
+    /// Creates a new SaveEntry.
+    pub fn new(game_mode: String, save_name: String) -> Self {
+        let relative_path = if game_mode.is_empty() {
+            save_name.clone()
+        } else {
+            format!("{}/{}", game_mode, save_name)
+        };
+        Self {
+            game_mode,
+            save_name,
+            relative_path,
+        }
+    }
+
+    /// Creates a SaveEntry for saves without a game mode (legacy/flat structure).
+    pub fn flat(save_name: String) -> Self {
+        Self::new(String::new(), save_name)
+    }
+
+    /// Returns the full path to this save directory.
+    ///
+    /// # Arguments
+    /// * `base_path` - The Saves base path
+    pub fn full_path(&self, base_path: &Path) -> PathBuf {
+        base_path.join(&self.relative_path)
+    }
+}
+
+/// Lists all save entries with game mode information.
+///
+/// Scans the Zomboid saves directory for the two-level structure `Saves/<GameMode>/<SaveName>`.
+/// Also supports legacy flat structure for backwards compatibility.
+///
+/// # Returns
+/// `ConfigResult<Vec<SaveEntry>>` - List of save entries with game mode info
+///
+/// # Behavior
+/// 1. Scans all subdirectories in the Saves folder
+/// 2. If a subdirectory looks like a game mode (contains save subdirectories),
+///    treats its children as saves
+/// 3. If a subdirectory looks like a save (contains map/*.bin files),
+///    treats it as a flat save (legacy structure)
+/// 4. Returns sorted list (by game mode, then save name)
+///
+/// # Example
+/// ```no_run
+/// use tauri_app_lib::config::list_save_entries;
+///
+/// let entries = list_save_entries().unwrap();
+/// for entry in entries {
+///     println!("{}: {}", entry.game_mode, entry.save_name);
+/// }
+/// ```
+pub fn list_save_entries() -> ConfigResult<Vec<SaveEntry>> {
+    let config = load_config()?;
+    let save_path = config.get_save_path()?;
+
+    if !save_path.exists() {
+        return Ok(Vec::new());
+    }
+
+    let mut entries = Vec::new();
+
+    // Read all entries in the Saves directory
+    for game_mode_entry in fs::read_dir(&save_path)
+        .map_err(FileOpsError::Io)?
+    {
+        let game_mode_entry = game_mode_entry.map_err(FileOpsError::Io)?;
+        let game_mode_path = game_mode_entry.path();
+
+        // Only process directories
+        if !game_mode_path.is_dir() {
+            continue;
+        }
+
+        let game_mode_name = match game_mode_path.file_name() {
+            Some(name) => name.to_string_lossy().to_string(),
+            None => continue,
+        };
+
+        // Check if this looks like a game mode directory (contains save subdirectories)
+        let mut has_save_subdirs = false;
+        let mut has_save_files = false;
+
+        if let Ok(sub_entries) = fs::read_dir(&game_mode_path) {
+            for sub_entry in sub_entries {
+                let sub_entry = match sub_entry {
+                    Ok(e) => e,
+                    Err(_) => continue,
+                };
+                let sub_path = sub_entry.path();
+
+                if sub_path.is_dir() {
+                    // Check if this subdirectory looks like a save
+                    if looks_like_save_directory(&sub_path) {
+                        has_save_subdirs = true;
+                        let save_name = sub_path.file_name()
+                            .and_then(|n| n.to_str())
+                            .unwrap_or("")
+                            .to_string();
+                        entries.push(SaveEntry::new(game_mode_name.clone(), save_name));
+                    }
+                } else {
+                    // Check if this is a save file (map/*.bin or save.bin at root)
+                    if looks_like_save_file(&sub_path) {
+                        has_save_files = true;
+                    }
+                }
+            }
+        }
+
+        // If this directory has save files but no save subdirectories,
+        // it might be a flat save (legacy structure)
+        if has_save_files && !has_save_subdirs {
+            if looks_like_save_directory(&game_mode_path) {
+                entries.push(SaveEntry::flat(game_mode_name));
+            }
+        }
+    }
+
+    // Sort by game mode, then by save name
+    entries.sort();
+
+    Ok(entries)
+}
+
+/// Checks if a directory looks like a Project Zomboid save directory.
+///
+/// A save directory typically contains:
+/// - A `map` subdirectory with `.bin` or `.dat` files
+/// - Or `save.bin` / `map_p.bin` files at the root
+fn looks_like_save_directory(path: &Path) -> bool {
+    if !path.is_dir() {
+        return false;
+    }
+
+    let map_dir = path.join("map");
+    if map_dir.is_dir() {
+        // Check for map chunk files
+        if let Ok(entries) = fs::read_dir(&map_dir) {
+            for entry in entries.flatten() {
+                let file_path = entry.path();
+                if file_path.is_file() {
+                    let name = file_path.file_name()
+                        .and_then(|n| n.to_str())
+                        .unwrap_or("");
+                    // Look for .bin or .dat files (typical map chunks)
+                    if name.ends_with(".bin") || name.ends_with(".dat") {
+                        return true;
+                    }
+                }
+            }
+        }
+    }
+
+    // Check for save files at root level
+    if let Ok(entries) = fs::read_dir(path) {
+        for entry in entries.flatten() {
+            let file_path = entry.path();
+            if file_path.is_file() {
+                let name = file_path.file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or("");
+                // Typical save files - be more specific to avoid false positives
+                // Check for specific known save files or map chunk files (prefix_*.bin)
+                if name == "save.bin" || name == "map_p.bin" || (name.starts_with("map_") && name.ends_with(".bin")) {
+                    return true;
+                }
+            }
+        }
+    }
+
+    false
+}
+
+/// Checks if a file looks like a Project Zomboid save file.
+fn looks_like_save_file(path: &Path) -> bool {
+    if !path.is_file() {
+        return false;
+    }
+
+    let name = match path.file_name() {
+        Some(n) => n.to_string_lossy(),
+        None => return false,
+    };
+
+    // Check for common save file patterns
+    name.ends_with(".bin") || name == "map_p.bin" || name == "save.bin"
+}
+
+/// Gets save entries grouped by game mode.
+///
+/// # Returns
+/// `ConfigResult<std::collections::HashMap<String, Vec<SaveEntry>>>` - Map of game mode to save entries
+///
+/// # Example
+/// ```no_run
+/// use tauri_app_lib::config::list_save_entries_by_game_mode;
+///
+/// let grouped = list_save_entries_by_game_mode().unwrap();
+/// for (game_mode, saves) in grouped {
+///     println!("{}: {} saves", game_mode, saves.len());
+/// }
+/// ```
+pub fn list_save_entries_by_game_mode() -> ConfigResult<std::collections::HashMap<String, Vec<SaveEntry>>> {
+    let entries = list_save_entries()?;
+    let mut grouped: std::collections::HashMap<String, Vec<SaveEntry>> = std::collections::HashMap::new();
+
+    for entry in entries {
+        // Use "(Other)" with parentheses to avoid collision with actual game mode named "Other"
+        let game_mode = if entry.game_mode.is_empty() {
+            "(Other)".to_string()
+        } else {
+            entry.game_mode.clone()
+        };
+
+        grouped.entry(game_mode).or_insert_with(Vec::new).push(entry);
+    }
+
+    Ok(grouped)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::fs;
+    use serial_test::serial;
+    use std::fs::{self, File};
+    use std::io::Write;
     use tempfile::TempDir;
 
     #[test]
@@ -552,5 +791,270 @@ mod tests {
 
         let result = config.validate();
         assert!(matches!(result, Err(FileOpsError::NotADirectory(_))));
+    }
+
+    // ============================================================================
+    // CORE-06: Save Scanning with Game Mode Support - Unit Tests
+    // ============================================================================
+
+    /// Helper to create a test save directory structure
+    fn create_test_save_structure(save_dir: &Path) {
+        fs::create_dir_all(save_dir.join("map")).unwrap();
+        File::create(save_dir.join("save.bin")).unwrap().write_all(b"game state").unwrap();
+        File::create(save_dir.join("map/pchunk_0_0.dat")).unwrap().write_all(b"map data").unwrap();
+    }
+
+    #[test]
+    fn test_save_entry_new() {
+        let entry = SaveEntry::new("Survival".to_string(), "MySave".to_string());
+        assert_eq!(entry.game_mode, "Survival");
+        assert_eq!(entry.save_name, "MySave");
+        assert_eq!(entry.relative_path, "Survival/MySave");
+    }
+
+    #[test]
+    fn test_save_entry_flat() {
+        let entry = SaveEntry::flat("OldSave".to_string());
+        assert_eq!(entry.game_mode, "");
+        assert_eq!(entry.save_name, "OldSave");
+        assert_eq!(entry.relative_path, "OldSave");
+    }
+
+    #[test]
+    fn test_save_entry_full_path() {
+        let entry = SaveEntry::new("Survival".to_string(), "MySave".to_string());
+        let base = Path::new("/home/user/Zomboid/Saves");
+        let full = entry.full_path(base);
+        assert_eq!(full, Path::new("/home/user/Zomboid/Saves/Survival/MySave"));
+    }
+
+    #[test]
+    fn test_save_entry_serialization() {
+        let entry = SaveEntry::new("Survival".to_string(), "MySave".to_string());
+        let json = serde_json::to_string(&entry).unwrap();
+        let parsed: SaveEntry = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed.game_mode, "Survival");
+        assert_eq!(parsed.save_name, "MySave");
+        assert_eq!(parsed.relative_path, "Survival/MySave");
+    }
+
+    #[test]
+    fn test_save_entry_ordering() {
+        let mut entries = vec![
+            SaveEntry::new("Survival".to_string(), "Save2".to_string()),
+            SaveEntry::new("Builder".to_string(), "Save1".to_string()),
+            SaveEntry::new("Survival".to_string(), "Save1".to_string()),
+        ];
+        entries.sort();
+        assert_eq!(entries[0].game_mode, "Builder");
+        assert_eq!(entries[1].game_mode, "Survival");
+        assert_eq!(entries[1].save_name, "Save1");
+        assert_eq!(entries[2].save_name, "Save2");
+    }
+
+    #[test]
+    #[serial]
+    fn test_list_save_entries_two_level_structure() {
+        let temp_dir = TempDir::new().unwrap();
+        let saves_dir = temp_dir.path().join("Saves");
+        fs::create_dir(&saves_dir).unwrap();
+
+        // Create two-level structure: Saves/<GameMode>/<SaveName>
+        let survival_mode = saves_dir.join("Survival");
+        let builder_mode = saves_dir.join("Builder");
+
+        let survival_save = survival_mode.join("MySurvival");
+        let builder_save = builder_mode.join("MyBuilder");
+
+        create_test_save_structure(&survival_save);
+        create_test_save_structure(&builder_save);
+
+        // Setup config
+        let config = Config::with_save_path(saves_dir.to_str().unwrap().to_string());
+        save_config(&config).unwrap();
+
+        let entries = list_save_entries().unwrap();
+
+        assert_eq!(entries.len(), 2);
+
+        // Check Survival save
+        let survival_entry = entries.iter().find(|e| e.game_mode == "Survival").unwrap();
+        assert_eq!(survival_entry.save_name, "MySurvival");
+        assert_eq!(survival_entry.relative_path, "Survival/MySurvival");
+
+        // Check Builder save
+        let builder_entry = entries.iter().find(|e| e.game_mode == "Builder").unwrap();
+        assert_eq!(builder_entry.save_name, "MyBuilder");
+        assert_eq!(builder_entry.relative_path, "Builder/MyBuilder");
+    }
+
+    #[test]
+    #[serial]
+    fn test_list_save_entries_flat_structure() {
+        let temp_dir = TempDir::new().unwrap();
+        let saves_dir = temp_dir.path().join("Saves");
+        fs::create_dir(&saves_dir).unwrap();
+
+        // Create flat structure (legacy): Saves/<SaveName>
+        let old_save = saves_dir.join("OldSave");
+        create_test_save_structure(&old_save);
+
+        // Setup config
+        let config = Config::with_save_path(saves_dir.to_str().unwrap().to_string());
+        save_config(&config).unwrap();
+
+        let entries = list_save_entries().unwrap();
+
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].game_mode, "");
+        assert_eq!(entries[0].save_name, "OldSave");
+        assert_eq!(entries[0].relative_path, "OldSave");
+    }
+
+    #[test]
+    #[serial]
+    fn test_list_save_entries_mixed_structure() {
+        let temp_dir = TempDir::new().unwrap();
+        let saves_dir = temp_dir.path().join("Saves");
+        fs::create_dir(&saves_dir).unwrap();
+
+        // Create mixed structure: some flat, some two-level
+        let old_save = saves_dir.join("OldSave");
+        create_test_save_structure(&old_save);
+
+        let survival_mode = saves_dir.join("Survival");
+        let survival_save = survival_mode.join("NewSave");
+        create_test_save_structure(&survival_save);
+
+        // Setup config
+        let config = Config::with_save_path(saves_dir.to_str().unwrap().to_string());
+        save_config(&config).unwrap();
+
+        let entries = list_save_entries().unwrap();
+
+        assert_eq!(entries.len(), 2);
+
+        // Flat save should have empty game_mode
+        let flat_entry = entries.iter().find(|e| e.save_name == "OldSave").unwrap();
+        assert_eq!(flat_entry.game_mode, "");
+
+        // Two-level save should have game_mode
+        let nested_entry = entries.iter().find(|e| e.save_name == "NewSave").unwrap();
+        assert_eq!(nested_entry.game_mode, "Survival");
+    }
+
+    #[test]
+    #[serial]
+    fn test_list_save_entries_nonexistent_path() {
+        let temp_dir = TempDir::new().unwrap();
+        let saves_dir = temp_dir.path().join("NonExistent");
+
+        let config = Config::with_save_path(saves_dir.to_str().unwrap().to_string());
+        save_config(&config).unwrap();
+
+        let entries = list_save_entries().unwrap();
+        assert_eq!(entries.len(), 0);
+    }
+
+    #[test]
+    #[serial]
+    fn test_list_save_entries_by_game_mode() {
+        let temp_dir = TempDir::new().unwrap();
+        let saves_dir = temp_dir.path().join("Saves");
+        fs::create_dir(&saves_dir).unwrap();
+
+        // Create multiple saves in different game modes
+        let survival_mode = saves_dir.join("Survival");
+        let builder_mode = saves_dir.join("Builder");
+
+        create_test_save_structure(&survival_mode.join("Save1"));
+        create_test_save_structure(&survival_mode.join("Save2"));
+        create_test_save_structure(&builder_mode.join("Build1"));
+
+        // Setup config
+        let config = Config::with_save_path(saves_dir.to_str().unwrap().to_string());
+        save_config(&config).unwrap();
+
+        let grouped = list_save_entries_by_game_mode().unwrap();
+
+        assert_eq!(grouped.len(), 2);
+        assert_eq!(grouped.get("Survival").unwrap().len(), 2);
+        assert_eq!(grouped.get("Builder").unwrap().len(), 1);
+    }
+
+    #[test]
+    fn test_looks_like_save_directory_with_map_files() {
+        let temp_dir = TempDir::new().unwrap();
+        let save_dir = temp_dir.path().join("save");
+
+        fs::create_dir_all(save_dir.join("map")).unwrap();
+        File::create(save_dir.join("map/pchunk_0_0.dat")).unwrap().write_all(b"data").unwrap();
+
+        assert!(looks_like_save_directory(&save_dir));
+    }
+
+    #[test]
+    fn test_looks_like_save_directory_with_save_bin() {
+        let temp_dir = TempDir::new().unwrap();
+        let save_dir = temp_dir.path().join("save");
+
+        fs::create_dir(&save_dir).unwrap();
+        File::create(save_dir.join("save.bin")).unwrap().write_all(b"data").unwrap();
+
+        assert!(looks_like_save_directory(&save_dir));
+    }
+
+    #[test]
+    fn test_looks_like_save_directory_empty() {
+        let temp_dir = TempDir::new().unwrap();
+        let save_dir = temp_dir.path().join("save");
+
+        fs::create_dir(&save_dir).unwrap();
+
+        assert!(!looks_like_save_directory(&save_dir));
+    }
+
+    #[test]
+    fn test_looks_like_save_file() {
+        let temp_dir = TempDir::new().unwrap();
+        let file_path = temp_dir.path().join("save.bin");
+        File::create(&file_path).unwrap().write_all(b"data").unwrap();
+
+        assert!(looks_like_save_file(&file_path));
+    }
+
+    #[test]
+    fn test_looks_like_save_file_non_bin() {
+        let temp_dir = TempDir::new().unwrap();
+        let file_path = temp_dir.path().join("readme.txt");
+        File::create(&file_path).unwrap().write_all(b"text").unwrap();
+
+        assert!(!looks_like_save_file(&file_path));
+    }
+
+    #[test]
+    #[serial]
+    fn test_list_save_entries_ignores_non_save_directories() {
+        let temp_dir = TempDir::new().unwrap();
+        let saves_dir = temp_dir.path().join("Saves");
+        fs::create_dir(&saves_dir).unwrap();
+
+        // Create a valid save
+        let survival_mode = saves_dir.join("Survival");
+        create_test_save_structure(&survival_mode.join("MySave"));
+
+        // Create directories that don't look like saves
+        fs::create_dir(saves_dir.join("EmptyFolder")).unwrap();
+        fs::create_dir(saves_dir.join("NotASave")).unwrap();
+
+        // Setup config
+        let config = Config::with_save_path(saves_dir.to_str().unwrap().to_string());
+        save_config(&config).unwrap();
+
+        let entries = list_save_entries().unwrap();
+
+        // Should only find the valid save, not the empty folders
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].save_name, "MySave");
     }
 }
