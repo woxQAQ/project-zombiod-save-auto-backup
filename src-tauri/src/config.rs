@@ -181,14 +181,8 @@ impl serde::Serialize for ConfigError {
 /// println!("Zomboid saves: {:?}", path);
 /// ```
 pub fn detect_zomboid_save_path() -> FileOpsResult<PathBuf> {
-    let base_path = if cfg!(target_os = "windows") {
-        // Windows: C:\Users\<User>\Zomboid\Saves
-        dirs::home_dir()
-            .map(|p| p.join("Zomboid").join("Saves"))
-    } else {
-        // Mac/Linux: ~/Zomboid/Saves
-        dirs::home_dir().map(|p| p.join("Zomboid").join("Saves"))
-    };
+    // Both Windows and Mac/Linux use the same path structure relative to home dir
+    let base_path = dirs::home_dir().map(|p| p.join("Zomboid").join("Saves"));
 
     match base_path {
         Some(path) => Ok(path),
@@ -227,15 +221,8 @@ pub fn get_default_backup_path() -> FileOpsResult<PathBuf> {
 /// - **macOS**: `~/Library/Application Support/ZomboidBackupTool`
 /// - **Linux**: `~/.config/ZomboidBackupTool`
 pub fn get_config_dir() -> ConfigResult<PathBuf> {
-    let config_dir = if cfg!(target_os = "windows") {
-        dirs::config_dir().map(|p| p.join("ZomboidBackupTool"))
-    } else if cfg!(target_os = "macos") {
-        dirs::config_dir().map(|p| p.join("ZomboidBackupTool"))
-    } else {
-        // Linux and others
-        dirs::config_dir().map(|p| p.join("ZomboidBackupTool"))
-    };
-
+    // dirs::config_dir() already handles platform differences correctly
+    let config_dir = dirs::config_dir().map(|p| p.join("ZomboidBackupTool"));
     config_dir.ok_or(ConfigError::ConfigDirNotFound)
 }
 
@@ -319,7 +306,7 @@ pub fn update_backup_path(backup_path: String) -> ConfigResult<()> {
 pub fn update_retention_count(count: usize) -> ConfigResult<()> {
     if count == 0 {
         return Err(ConfigError::InvalidValue(
-            "Retention count must be at least 1".to_string()
+            format!("Retention count must be at least 1, got {}", count)
         ));
     }
 
