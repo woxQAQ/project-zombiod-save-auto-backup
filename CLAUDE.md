@@ -2,9 +2,17 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Quick Start
+
+First-time setup:
+```bash
+pnpm install      # Install dependencies
+pnpm tauri dev    # Start development server
+```
+
 ## Project Overview
 
-This is a **Tauri + React + TypeScript** desktop application for **Project Zomboid save game backup/restore**. It provides automated backups and restore functionality (Save/Load) for the hardcore survival game Project Zomboid.
+A **Tauri + React + TypeScript** desktop application for **Project Zomboid save game backup/restore**. Provides automated backups and restore functionality (Save/Load) for the hardcore survival game Project Zomboid.
 
 **Tech Stack:**
 - **Backend**: Rust (Tauri 2.x)
@@ -28,7 +36,13 @@ pnpm tauri build
 pnpm dev
 
 # Type checking
-tsc --noEmit
+pnpm tsc --noEmit
+
+# Run tests (Rust backend)
+cd src-tauri && cargo test
+
+# Linting (Rust)
+cd src-tauri && cargo clippy
 ```
 
 **Note**: Always use `pnpm tauri dev` for development - this builds both the frontend and Rust backend together.
