@@ -32,6 +32,19 @@ pub struct Config {
     /// Maximum number of backups to retain per save.
     /// Old backups exceeding this count will be garbage collected.
     pub retention_count: usize,
+
+    /// Whether to automatically check for updates on startup.
+    #[serde(default = "default_auto_check_updates")]
+    pub auto_check_updates: bool,
+
+    /// Timestamp of the last update check (ISO 8601 format).
+    #[serde(default)]
+    pub last_update_check: Option<String>,
+}
+
+/// Default value for auto_check_updates field.
+fn default_auto_check_updates() -> bool {
+    true
 }
 
 impl Default for Config {
@@ -40,6 +53,8 @@ impl Default for Config {
             save_path: None,
             backup_path: None,
             retention_count: DEFAULT_RETENTION_COUNT,
+            auto_check_updates: default_auto_check_updates(),
+            last_update_check: None,
         }
     }
 }
@@ -670,6 +685,8 @@ mod tests {
             save_path: Some("/test/saves".to_string()),
             backup_path: Some("/test/backups".to_string()),
             retention_count: 15,
+            auto_check_updates: true,
+            last_update_check: None,
         };
 
         // Serialize to JSON
@@ -787,6 +804,8 @@ mod tests {
             save_path: Some(saves_dir.to_str().unwrap().to_string()),
             backup_path: Some(backup_file.to_str().unwrap().to_string()),
             retention_count: 10,
+            auto_check_updates: true,
+            last_update_check: None,
         };
 
         let result = config.validate();

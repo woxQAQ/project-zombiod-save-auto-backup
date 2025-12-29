@@ -6,6 +6,7 @@ pub mod backup;
 pub mod config;
 pub mod file_ops;
 pub mod restore;
+pub mod update_checker;
 
 use auto_backup::{AutoBackupStatus, AutoBackupResultT};
 use backup::{BackupInfo, BackupResult, BackupResultT};
@@ -14,6 +15,7 @@ use file_ops::FileOpsResult;
 use restore::{RestoreResult, RestoreResultT, UndoSnapshotInfo};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
+use update_checker::UpdateInfo;
 
 /// Result of directory size query
 #[derive(Debug, Serialize, Deserialize)]
@@ -796,6 +798,92 @@ async fn refresh_auto_backup_saves_command() -> AutoBackupResultT<()> {
     auto_backup::refresh_auto_backup_saves().await
 }
 
+// ============================================================================
+// Update Checker Commands
+// ============================================================================
+
+/// Tauri command: Checks for updates via GitHub API.
+///
+/// # Returns
+/// `Result<UpdateInfo, String>` - Update information or error message
+///
+/// # Behavior
+/// - Fetches the latest release from GitHub
+/// - Compares with current version
+/// - Skips pre-releases
+///
+/// # Example (Frontend)
+/// ```javascript
+/// import { invoke } from '@tauri-apps/api/core';
+///
+/// const info = await invoke('check_for_updates');
+/// if (info.has_update) {
+///   console.log('New version:', info.latest_version);
+///   console.log('Release notes:', info.release_notes);
+/// }
+/// ```
+#[tauri::command]
+async fn check_for_updates() -> Result<UpdateInfo, String> {
+    update_checker::check_for_updates().await
+}
+
+/// Tauri command: Gets the current application version.
+///
+/// # Returns
+/// `String` - Current version (e.g., "0.1.0")
+///
+/// # Example (Frontend)
+/// ```javascript
+/// import { invoke } from '@tauri-apps/api/core';
+///
+/// const version = await invoke('get_app_version');
+/// console.log('Current version:', version);
+/// ```
+#[tauri::command]
+fn get_app_version() -> String {
+    update_checker::get_current_version()
+}
+
+/// Tauri command: Gets the auto-check updates setting.
+///
+/// # Returns
+/// `Result<bool, String>` - Whether auto-check is enabled
+///
+/// # Example (Frontend)
+/// ```javascript
+/// import { invoke } from '@tauri-apps/api/core';
+///
+/// const enabled = await invoke('get_auto_check_updates');
+/// console.log('Auto-check enabled:', enabled);
+/// ```
+#[tauri::command]
+fn get_auto_check_updates() -> Result<bool, String> {
+    let config = config::load_config().map_err(|e| e.to_string())?;
+    Ok(config.auto_check_updates)
+}
+
+/// Tauri command: Sets the auto-check updates setting.
+///
+/// # Arguments
+/// * `enabled` - Whether to enable auto-check on startup
+///
+/// # Returns
+/// `Result<(), String>` - Ok(()) on success
+///
+/// # Example (Frontend)
+/// ```javascript
+/// import { invoke } from '@tauri-apps/api/core';
+///
+/// await invoke('set_auto_check_updates', { enabled: true });
+/// ```
+#[tauri::command]
+fn set_auto_check_updates(enabled: bool) -> Result<(), String> {
+    let mut config = config::load_config().map_err(|e| e.to_string())?;
+    config.auto_check_updates = enabled;
+    config::save_config(&config).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -839,7 +927,12 @@ pub fn run() {
             set_auto_backup_interval_command,
             enable_auto_backup_command,
             disable_auto_backup_command,
-            refresh_auto_backup_saves_command
+            refresh_auto_backup_saves_command,
+            // Update checker commands
+            check_for_updates,
+            get_app_version,
+            get_auto_check_updates,
+            set_auto_check_updates
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

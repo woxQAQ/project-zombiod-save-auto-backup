@@ -9,6 +9,16 @@ interface Config {
   save_path: string | null;
   backup_path: string | null;
   retention_count: number;
+  auto_check_updates?: boolean;
+}
+
+interface UpdateInfo {
+  has_update: boolean;
+  current_version: string;
+  latest_version: string;
+  release_url: string;
+  release_notes: string;
+  published_at: string;
 }
 
 interface SettingsProps {
@@ -30,6 +40,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
     save_path: null,
     backup_path: null,
     retention_count: 10,
+    auto_check_updates: true,
   });
   const [savePathInput, setSavePathInput] = useState("");
   const [backupPathInput, setBackupPathInput] = useState("");
@@ -38,6 +49,10 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  // Update check states
+  const [autoCheckUpdates, setAutoCheckUpdates] = useState(true);
+  const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
 
   // Ref to track the timeout for cleanup
   const successTimeoutRef = useRef<number | null>(null);
@@ -60,6 +75,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
       setSavePathInput(loadedConfig.save_path || "");
       setBackupPathInput(loadedConfig.backup_path || "");
       setRetentionInput(loadedConfig.retention_count.toString());
+      setAutoCheckUpdates(loadedConfig.auto_check_updates ?? true);
     } catch (err) {
       setError(`Failed to load configuration: ${err}`);
     } finally {
@@ -125,6 +141,37 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
       setError(null);
     } catch (err) {
       setError(`Failed to get default backup path: ${err}`);
+    }
+  };
+
+  const handleCheckUpdate = async () => {
+    setIsCheckingUpdate(true);
+    setError(null);
+    try {
+      const updateInfo = await invoke<UpdateInfo>("check_for_updates");
+      if (updateInfo.has_update) {
+        // Open release page in browser
+        window.open(updateInfo.release_url, "_blank");
+        setSuccessMessage(
+          `New version ${updateInfo.latest_version} available! Opening download page...`,
+        );
+      } else {
+        setSuccessMessage("You're already on the latest version!");
+      }
+    } catch (err) {
+      setError(`Update check failed: ${err}`);
+    } finally {
+      setIsCheckingUpdate(false);
+    }
+  };
+
+  const handleToggleAutoCheck = async (enabled: boolean) => {
+    try {
+      await invoke("set_auto_check_updates", { enabled });
+      setAutoCheckUpdates(enabled);
+      setSuccessMessage(`Auto-check ${enabled ? "enabled" : "disabled"}`);
+    } catch (err) {
+      setError(`Failed to update settings: ${err}`);
     }
   };
 
@@ -349,6 +396,84 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
                 <p className="text-xs text-gray-500">
                   Old backups exceeding this count will be automatically deleted. Recommended: 5-20
                 </p>
+              </div>
+
+              {/* Application Updates Section */}
+              <div className="space-y-2">
+                <h3 className="text-sm font-medium text-foreground">Application Updates</h3>
+
+                {/* Auto Check Toggle */}
+                <div className="flex items-center justify-between bg-gray-900 border border-gray-800 rounded-lg px-4 py-3">
+                  <div>
+                    <p className="text-sm font-medium text-foreground">
+                      Check for updates automatically
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      When enabled, the app will check for updates on startup
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleToggleAutoCheck(!autoCheckUpdates)}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      autoCheckUpdates ? "bg-primary" : "bg-gray-700"
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        autoCheckUpdates ? "translate-x-6" : "translate-x-1"
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                {/* Manual Check Button */}
+                <button
+                  type="button"
+                  onClick={handleCheckUpdate}
+                  disabled={isCheckingUpdate}
+                  className="w-full px-4 py-2 bg-gray-800 hover:bg-gray-700 text-foreground rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+                >
+                  {isCheckingUpdate ? (
+                    <>
+                      <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                        <title>Loading</title>
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                        />
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                        />
+                      </svg>
+                      <span>Checking for updates...</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg
+                        className="w-4 h-4"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                      >
+                        <title>Refresh icon</title>
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                        />
+                      </svg>
+                      <span>Check for Updates</span>
+                    </>
+                  )}
+                </button>
               </div>
 
               {/* Info Box */}
