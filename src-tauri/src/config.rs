@@ -6,6 +6,7 @@
 //! - User preference management (paths, backup retention settings)
 
 use crate::file_ops::{FileOpsError, FileOpsResult};
+use crate::tags::Tag;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -406,6 +407,9 @@ pub struct SaveEntry {
     pub save_name: String,
     /// Full relative path from Saves root (e.g., "Survival/MySave")
     pub relative_path: String,
+    /// Tags associated with this save
+    #[serde(default)]
+    pub tags: Vec<Tag>,
 }
 
 impl SaveEntry {
@@ -420,6 +424,7 @@ impl SaveEntry {
             game_mode,
             save_name,
             relative_path,
+            tags: Vec::new(),
         }
     }
 
@@ -509,7 +514,22 @@ pub fn list_save_entries() -> ConfigResult<Vec<SaveEntry>> {
                             .and_then(|n| n.to_str())
                             .unwrap_or("")
                             .to_string();
-                        entries.push(SaveEntry::new(game_mode_name.clone(), save_name));
+                        let relative_path = if game_mode_name.is_empty() {
+                            save_name.clone()
+                        } else {
+                            format!("{}/{}", game_mode_name, save_name)
+                        };
+
+                        // Get tags for this save
+                        let tags = crate::tags::get_save_tags(&relative_path)
+                            .unwrap_or_default();
+
+                        entries.push(SaveEntry {
+                            game_mode: game_mode_name.clone(),
+                            save_name,
+                            relative_path,
+                            tags,
+                        });
                     }
                 } else {
                     // Check if this is a save file (map/*.bin or save.bin at root)
@@ -524,7 +544,16 @@ pub fn list_save_entries() -> ConfigResult<Vec<SaveEntry>> {
         // it might be a flat save (legacy structure)
         if has_save_files && !has_save_subdirs {
             if looks_like_save_directory(&game_mode_path) {
-                entries.push(SaveEntry::flat(game_mode_name));
+                // Get tags for this save
+                let tags = crate::tags::get_save_tags(&game_mode_name)
+                    .unwrap_or_default();
+
+                entries.push(SaveEntry {
+                    game_mode: String::new(),
+                    save_name: game_mode_name.clone(),
+                    relative_path: game_mode_name.clone(),
+                    tags,
+                });
             }
         }
     }

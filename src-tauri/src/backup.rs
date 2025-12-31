@@ -8,6 +8,7 @@
 use crate::config as config_module;
 use crate::config::ConfigError;
 use crate::file_ops::{create_tar_gz, delete_file, get_file_size, FileOpsError, FileOpsResult};
+use crate::tags::Tag;
 use chrono::{DateTime, Local, Utc};
 use serde::{Deserialize, Serialize, Serializer};
 use std::fs;
@@ -29,6 +30,9 @@ pub struct BackupInfo {
     pub created_at: String,
     /// Name of the save this backup belongs to
     pub save_name: String,
+    /// Tags associated with this backup
+    #[serde(default)]
+    pub tags: Vec<Tag>,
 }
 
 /// Result of a backup creation operation.
@@ -368,6 +372,7 @@ fn list_backup_files(save_backup_dir: &Path) -> FileOpsResult<Vec<BackupFile>> {
 ///
 /// # Behavior
 /// - Only includes completed .tar.gz files (excludes .tmp temporary files)
+/// - Populates tag information for each backup
 pub fn list_backups(save_name: &str) -> BackupResultT<Vec<BackupInfo>> {
     let config = config_module::load_config()?;
     let backup_base_path = config.get_backup_path()?;
@@ -400,6 +405,11 @@ pub fn list_backups(save_name: &str) -> BackupResultT<Vec<BackupInfo>> {
                             .unwrap_or_else(|_| SystemTime::now());
                         let created_dt: DateTime<Utc> = created.into();
                         let created_at = created_dt.to_rfc3339();
+
+                        // Get tags for this backup
+                        let tags = crate::tags::get_backup_tags(save_name, name_str)
+                            .unwrap_or_default();
+
                         backups.push(BackupInfo {
                             name: name_str.to_string(),
                             path: crate::file_ops::normalize_path_for_display(&path),
@@ -407,6 +417,7 @@ pub fn list_backups(save_name: &str) -> BackupResultT<Vec<BackupInfo>> {
                             size_formatted,
                             created_at,
                             save_name: save_name.to_string(),
+                            tags,
                         });
                     }
                 }
@@ -452,6 +463,10 @@ pub fn get_backup_info(save_name: &str, backup_name: &str) -> BackupResultT<Back
     let created_dt: DateTime<Utc> = created.into();
     let created_at = created_dt.to_rfc3339();
 
+    // Get tags for this backup
+    let tags = crate::tags::get_backup_tags(save_name, backup_name)
+        .unwrap_or_default();
+
     Ok(BackupInfo {
         name: backup_name.to_string(),
         path: crate::file_ops::normalize_path_for_display(&backup_path),
@@ -459,6 +474,7 @@ pub fn get_backup_info(save_name: &str, backup_name: &str) -> BackupResultT<Back
         size_formatted,
         created_at,
         save_name: save_name.to_string(),
+        tags,
     })
 }
 
@@ -865,6 +881,7 @@ mod tests {
             size_formatted: "1.00 KB".to_string(),
             created_at: "2024-12-28T10:00:00Z".to_string(),
             save_name: "Survival".to_string(),
+            tags: Vec::new(),
         };
 
         let json = serde_json::to_string(&info).unwrap();

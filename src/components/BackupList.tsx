@@ -1,5 +1,10 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useState } from "react";
+import { useBackupTags, useTags } from "../hooks/useTags";
+import type { Tag } from "../types/tags";
+import { backupTarget } from "../types/tags";
+import { TagEditor } from "./TagEditor";
+import { TagList } from "./TagList";
 
 interface BackupListProps {
   saveName: string | null;
@@ -14,6 +19,7 @@ interface BackupInfo {
   size_formatted: string;
   created_at: string;
   path: string;
+  tags: Tag[];
 }
 
 interface BackupItem {
@@ -22,6 +28,7 @@ interface BackupItem {
   createdAt: string;
   timeAgo: string;
   backupPath: string;
+  tags: Tag[];
 }
 
 /**
@@ -76,6 +83,20 @@ export const BackupList: React.FC<BackupListProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Tag-related state
+  const { tags: availableTags, loadAllTags } = useTags();
+  const { addBackupTags, removeBackupTags } = useBackupTags();
+  const [tagEditorTarget, setTagEditorTarget] = useState<{
+    saveName: string;
+    backupName: string;
+  } | null>(null);
+  const [currentBackupTags, setCurrentBackupTags] = useState<Tag[]>([]);
+
+  // Load all tags on mount
+  useEffect(() => {
+    loadAllTags();
+  }, [loadAllTags]);
+
   const loadBackups = useCallback(async () => {
     if (!saveName) return;
 
@@ -92,6 +113,7 @@ export const BackupList: React.FC<BackupListProps> = ({
         createdAt: formatDateTime(info.created_at),
         timeAgo: formatTimeAgo(info.created_at),
         backupPath: info.path,
+        tags: info.tags,
       }));
 
       setBackups(items);
@@ -134,6 +156,40 @@ export const BackupList: React.FC<BackupListProps> = ({
       console.error(`Failed to open ${backup.backupPath} in file manager:`, err);
       // Optionally show an error message to the user
     }
+  };
+
+  // Tag-related handlers
+  const handleEditTags = (backup: BackupItem) => {
+    if (!saveName) return;
+    setCurrentBackupTags(backup.tags);
+    setTagEditorTarget({ saveName, backupName: backup.name });
+  };
+
+  const handleCloseTagEditor = () => {
+    setTagEditorTarget(null);
+    setCurrentBackupTags([]);
+  };
+
+  const handleSaveTags = async (tagNames: string[]) => {
+    if (!tagEditorTarget) return;
+
+    // Calculate tags to add and remove
+    const currentTagNames = new Set(currentBackupTags.map((t) => t.name));
+    const newTagNames = new Set(tagNames);
+
+    const toAdd = tagNames.filter((n) => !currentTagNames.has(n));
+    const toRemove = Array.from(currentTagNames).filter((n) => !newTagNames.has(n));
+
+    // Perform updates
+    if (toRemove.length > 0) {
+      await removeBackupTags(tagEditorTarget.saveName, tagEditorTarget.backupName, toRemove);
+    }
+    if (toAdd.length > 0) {
+      await addBackupTags(tagEditorTarget.saveName, tagEditorTarget.backupName, toAdd);
+    }
+
+    // Reload backups to reflect changes
+    await loadBackups();
   };
 
   if (!saveName) {
@@ -259,7 +315,7 @@ export const BackupList: React.FC<BackupListProps> = ({
       <div className="divide-y divide-gray-800">
         {backups.map((backup) => (
           <div key={backup.name} className="px-6 py-4 hover:bg-gray-800/50 transition-colors group">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between mb-2">
               {/* Left: Time info */}
               <div className="flex-1">
                 <div className="flex items-center space-x-3">
@@ -297,6 +353,28 @@ export const BackupList: React.FC<BackupListProps> = ({
                   className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded transition-colors"
                 >
                   Restore
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleEditTags(backup)}
+                  className="p-2 text-purple-400 hover:bg-purple-900/30 rounded transition-colors opacity-0 group-hover:opacity-100"
+                  aria-label="Edit tags"
+                  title="Edit tags"
+                >
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    className="w-5 h-5"
+                  >
+                    <title>Tag icon</title>
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"
+                    />
+                  </svg>
                 </button>
                 <button
                   type="button"
@@ -370,9 +448,24 @@ export const BackupList: React.FC<BackupListProps> = ({
                 )}
               </div>
             </div>
+
+            {/* Tags display */}
+            <TagList tags={backup.tags} />
           </div>
         ))}
       </div>
+
+      {/* Tag Editor Modal */}
+      {tagEditorTarget && (
+        <TagEditor
+          isOpen={!!tagEditorTarget}
+          target={backupTarget(tagEditorTarget.saveName, tagEditorTarget.backupName)}
+          currentTags={currentBackupTags}
+          availableTags={availableTags}
+          onSave={handleSaveTags}
+          onCancel={handleCloseTagEditor}
+        />
+      )}
     </div>
   );
 };

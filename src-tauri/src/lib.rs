@@ -5,10 +5,12 @@ pub mod backup;
 pub mod config;
 pub mod file_ops;
 pub mod restore;
+pub mod tags;
 pub mod update_checker;
 
 use backup::{BackupInfo, BackupResult, BackupResultT};
 use config::{Config, ConfigResult, SaveEntry};
+use tags::{Tag, TagsResultT};
 use file_ops::FileOpsResult;
 use restore::{GameProcessCheckResult, RestoreResult, RestoreResultT, UndoSnapshotInfo};
 use serde::{Deserialize, Serialize};
@@ -789,6 +791,151 @@ fn set_auto_check_updates(enabled: bool) -> Result<(), String> {
     Ok(())
 }
 
+// ============================================================================
+// Tags Commands
+// ============================================================================
+
+/// Tauri command: Adds tags to a backup.
+///
+/// # Arguments
+/// * `saveName` - Save name
+/// * `backupName` - Backup name
+/// * `tags` - Tag names to add
+///
+/// # Returns
+/// `TagsResultT<()>` - Ok(()) on success
+///
+/// # Example (Frontend)
+/// ```javascript
+/// import { invoke } from '@tauri-apps/api/core';
+///
+/// await invoke('add_tags_to_backup', {
+///   saveName: 'Survival',
+///   backupName: '2024-12-28_14-30-45.tar.gz',
+///   tags: ['important', 'test']
+/// });
+/// ```
+#[tauri::command]
+fn add_tags_to_backup_command(
+    save_name: String,
+    backup_name: String,
+    tags: Vec<String>,
+) -> TagsResultT<()> {
+    tags::add_tags_to_backup(&save_name, &backup_name, tags)
+        .map_err(|e| e.to_string())
+}
+
+/// Tauri command: Removes tags from a backup.
+///
+/// # Arguments
+/// * `saveName` - Save name
+/// * `backupName` - Backup name
+/// * `tags` - Tag names to remove
+///
+/// # Returns
+/// `TagsResultT<()>` - Ok(()) on success
+#[tauri::command]
+fn remove_tags_from_backup_command(
+    save_name: String,
+    backup_name: String,
+    tags: Vec<String>,
+) -> TagsResultT<()> {
+    tags::remove_tags_from_backup(&save_name, &backup_name, tags)
+        .map_err(|e| e.to_string())
+}
+
+/// Tauri command: Gets tags for a backup.
+///
+/// # Arguments
+/// * `saveName` - Save name
+/// * `backupName` - Backup name
+///
+/// # Returns
+/// `TagsResultT<Vec<Tag>>` - List of tags
+#[tauri::command]
+fn get_backup_tags_command(save_name: String, backup_name: String) -> TagsResultT<Vec<Tag>> {
+    tags::get_backup_tags(&save_name, &backup_name)
+        .map_err(|e| e.to_string())
+}
+
+/// Tauri command: Adds tags to a save.
+///
+/// # Arguments
+/// * `relativePath` - Save relative path
+/// * `tags` - Tag names to add
+///
+/// # Returns
+/// `TagsResultT<()>` - Ok(()) on success
+#[tauri::command]
+fn add_tags_to_save_command(relative_path: String, tags: Vec<String>) -> TagsResultT<()> {
+    tags::add_tags_to_save(&relative_path, tags)
+        .map_err(|e| e.to_string())
+}
+
+/// Tauri command: Removes tags from a save.
+///
+/// # Arguments
+/// * `relativePath` - Save relative path
+/// * `tags` - Tag names to remove
+///
+/// # Returns
+/// `TagsResultT<()>` - Ok(()) on success
+#[tauri::command]
+fn remove_tags_from_save_command(relative_path: String, tags: Vec<String>) -> TagsResultT<()> {
+    tags::remove_tags_from_save(&relative_path, tags)
+        .map_err(|e| e.to_string())
+}
+
+/// Tauri command: Gets tags for a save.
+///
+/// # Arguments
+/// * `relativePath` - Save relative path
+///
+/// # Returns
+/// `TagsResultT<Vec<Tag>>` - List of tags
+#[tauri::command]
+fn get_save_tags_command(relative_path: String) -> TagsResultT<Vec<Tag>> {
+    tags::get_save_tags(&relative_path)
+        .map_err(|e| e.to_string())
+}
+
+/// Tauri command: Creates a new tag.
+///
+/// # Arguments
+/// * `name` - Tag name (must be unique)
+/// * `color` - Tag color (hex format like #FF5733)
+///
+/// # Returns
+/// `TagsResultT<()>` - Ok(()) on success
+#[tauri::command]
+fn create_tag_command(name: String, color: String) -> TagsResultT<()> {
+    tags::create_tag(name, color)
+        .map_err(|e| e.to_string())
+}
+
+/// Tauri command: Deletes a tag.
+///
+/// # Arguments
+/// * `name` - Tag name to delete
+///
+/// # Returns
+/// `TagsResultT<()>` - Ok(()) on success
+#[tauri::command]
+fn delete_tag_command(name: String) -> TagsResultT<()> {
+    tags::delete_tag(name)
+        .map_err(|e| e.to_string())
+}
+
+/// Tauri command: Gets all defined tags.
+///
+/// # Returns
+/// `TagsResultT<Vec<Tag>>` - List of all tags
+#[tauri::command]
+fn get_all_tags_command() -> TagsResultT<Vec<Tag>> {
+    tags::get_all_tags()
+        .map_err(|e| e.to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -831,7 +978,17 @@ pub fn run() {
             check_for_updates,
             get_app_version,
             get_auto_check_updates,
-            set_auto_check_updates
+            set_auto_check_updates,
+            // Tags commands
+            add_tags_to_backup_command,
+            remove_tags_from_backup_command,
+            get_backup_tags_command,
+            add_tags_to_save_command,
+            remove_tags_from_save_command,
+            get_save_tags_command,
+            create_tag_command,
+            delete_tag_command,
+            get_all_tags_command
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
