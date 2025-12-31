@@ -8,7 +8,7 @@
 use crate::config as config_module;
 use crate::config::ConfigError;
 use crate::file_ops::{create_tar_gz, delete_file, get_file_size, FileOpsError, FileOpsResult};
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Local, Utc};
 use serde::{Deserialize, Serialize, Serializer};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -126,7 +126,7 @@ pub type BackupResultT<T> = Result<T, BackupError>;
 /// // Returns: "2024-12-28_14-30-45.tar.gz"
 /// ```
 pub fn generate_backup_name(_save_name: &str) -> String {
-    let now = Utc::now();
+    let now = Local::now();
     let timestamp = now.format("%Y-%m-%d_%H-%M-%S");
     format!("{}.tar.gz", timestamp)
 }
