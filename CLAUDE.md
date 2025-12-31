@@ -41,8 +41,12 @@ pnpm tsc --noEmit
 # Run tests (Rust backend)
 cd src-tauri && cargo test
 
-# Linting (Rust)
-cd src-tauri && cargo clippy
+# Linting
+pnpm lint          # Frontend (Biome)
+pnpm tauri:check   # Backend (Cargo clippy)
+
+# Fix linting issues
+pnpm lint:fix
 ```
 
 **Note**: Always use `pnpm tauri dev` for development - this builds both the frontend and Rust backend together.
