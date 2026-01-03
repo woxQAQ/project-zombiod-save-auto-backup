@@ -205,34 +205,74 @@ pub fn check_game_running() -> GameProcessCheckResult {
     }
 }
 
-/// Windows-specific game detection using tasklist.
+/// Windows-specific game detection using Windows API.
 #[cfg(target_os = "windows")]
 fn check_game_running_windows() -> GameProcessCheckResult {
-    use std::process::Command;
+    use windows::Win32::Foundation::CloseHandle;
+    use windows::Win32::System::ProcessStatus::{EnumProcesses, K32GetModuleBaseNameW};
+    use windows::Win32::System::Threading::OpenProcess;
+    use windows::Win32::System::ProcessStatus::PROCESS_QUERY_INFORMATION;
+    use windows::Win32::System::Threading::PROCESS_VM_READ;
 
-    // Try to list processes and find ProjectZomboid
-    let output = match Command::new("tasklist")
-        .args(&["/FO", "CSV", "/NH"])
-        .output()
-    {
-        Ok(output) => output,
-        Err(_) => return GameProcessCheckResult {
+    const PROCESS_COUNT: u32 = 1024;
+    let mut process_ids = [0u32; PROCESS_COUNT as usize];
+    let mut bytes_returned = 0;
+
+    // Get list of process IDs
+    if unsafe {
+        EnumProcesses(
+            process_ids.as_mut_ptr(),
+            std::mem::size_of_val(&process_ids) as u32,
+            &mut bytes_returned,
+        )
+    }.is_err() {
+        return GameProcessCheckResult {
             is_running: false,
             process_name: None,
-        },
-    };
+        };
+    }
 
-    let stdout = String::from_utf8_lossy(&output.stdout);
+    let process_count = bytes_returned / std::mem::size_of::<u32>() as u32;
 
-    // Check for ProjectZomboid64.exe or ProjectZomboid.exe
-    let process_names = ["ProjectZomboid64.exe", "ProjectZomboid.exe"];
-    for process_name in &process_names {
-        // tasklist CSV format: "ProjectZomboid64.exe","12345",...
-        if stdout.contains(&format!("\"{}\"", process_name)) {
-            return GameProcessCheckResult {
-                is_running: true,
-                process_name: Some(process_name.to_string()),
+    // Target process names to check
+    let target_names = [
+        "ProjectZomboid64.exe",
+        "ProjectZomboid.exe",
+    ];
+
+    // Check each process
+    for i in 0..process_count as usize {
+        let pid = process_ids[i];
+        if pid == 0 {
+            continue;
+        }
+
+        // Open the process to query its name
+        let handle = unsafe {
+            OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, false, pid)
+        };
+
+        if let Ok(h) = handle {
+            let mut name_buffer = [0u16; 260];
+            let name_len = unsafe {
+                K32GetModuleBaseNameW(h, None, &mut name_buffer)
             };
+
+            if name_len > 0 {
+                let process_name = String::from_utf16_lossy(&name_buffer[..name_len as usize]);
+
+                for target in &target_names {
+                    if process_name.eq_ignore_ascii_case(target) {
+                        unsafe { let _ = CloseHandle(h); }
+                        return GameProcessCheckResult {
+                            is_running: true,
+                            process_name: Some(target.to_string()),
+                        };
+                    }
+                }
+            }
+
+            unsafe { let _ = CloseHandle(h); }
         }
     }
 
